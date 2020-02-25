@@ -180,7 +180,8 @@ if (interactive()) {
                   status = "primary",
                   title = "Box 3",
                   # div(...) is another example of output we can do in a box
-                  div(DT::dataTableOutput('dataexample')),
+                  div(div(style = 'overflow-x:scroll',
+                          DT::dataTableOutput('dataexample'))),
                   # max width = 12, so since this is 12 it will span the whole body
                   width = 12
                   ) # end of box
@@ -247,6 +248,25 @@ if (interactive()) {
         }
       }) # end output$body
       
+      
+      
+      ### begin testing api ###
+      r <- GET(
+        "https://free-nba.p.rapidapi.com/stats",
+        add_headers(`X-RapidAPI-Key` = "aae7df4492msh5823be00af21410p188e17jsn6409df5b231e"),
+        query = list(
+          page = "0",
+          `per_page` = "100"
+        )
+      )
+      json <- content(r, as = "text")
+      # fromJSON(json, flatten = TRUE)$data
+      output$dataexample <- DT::renderDataTable({fromJSON(json, flatten = TRUE)$data})
+      
+      ### end testing api ###
+      
+      
+      
       ### used for the dataTable at the bottom of the output for tab1 ###
       carsData <- eventReactive(input$update, {
         selectedDat <- mtcars %>% 
@@ -254,9 +274,9 @@ if (interactive()) {
         selectedDat
       })
       
-      output$dataexample <- DT::renderDataTable({
-        data = carsData()
-      })
+      # output$dataexample <- DT::renderDataTable({
+      #   data = carsData()
+      # })
       
       ### this is an example of making the output for the box with the time series (box 2) ###
       # 1) makes the data when the button is clicked with `x` and `y`
