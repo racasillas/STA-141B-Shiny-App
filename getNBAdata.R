@@ -206,8 +206,10 @@ for (i in 1:length(urlCodes)) {
 }
 
 playerStats <- playerStats %>% 
+  rename(RANK.POS = RANK) %>% 
   as.data.table(.) %>% 
-  arrange(desc(PTS))
+  arrange(desc(PTS))  %>% 
+  as.data.frame()
 
 visibleHeaders = getHeaders(playerPage)
 visibleHeaders = c(visibleHeaders, "POSITION")
