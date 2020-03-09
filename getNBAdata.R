@@ -3,8 +3,8 @@ library(jsonlite)
 library(rvest)
 library(RSelenium)
 library(wdman)
-library(httr)
-library(data.table)
+
+
 ##### Functions #####
 
 getHeaders = function(webpage) {
@@ -75,6 +75,9 @@ getData = function(webpage, visibleHeaders) {
   
 }
 
+
+##### Set up Dynamic Scraping #####
+
 # Dynamic scraping is needed for this 
 
 # server <- phantomjs(port = 4567L, verbose = FALSE)
@@ -134,7 +137,7 @@ teamPage <- rd$getPageSource() %>% str_flatten() %>% read_html()
 
 visibleHeaders_Team <- getHeaders(teamPage)
 
-teamStats <- getData(teamPage, visibleHeaders_Team)
+extractedStats_Team <- getData(teamPage, visibleHeaders_Team)
   
 
 
@@ -147,7 +150,9 @@ playerURL <- "https://stats.nba.com/stats/leagueLeaders?LeagueID=00&PerMode=PerG
 # If totals are desired instead of per game stats, use this
 # playerURL <- "https://stats.nba.com/stats/leagueLeaders?LeagueID=00&PerMode=Totals&Scope=S&Season=2019-20&SeasonType=Regular+Season&StatCategory=PTS"
 
-playerData <- fromJSON(playerURL, simplifyDataFrame = TRUE)
+playerData <- fromJSON(playerURL, simplifyDataFrame = TRUE)$resultSet$rowSet %>% data.frame(stringsAsFactors = FALSE)
+
+names(playerData) <- fromJSON(playerURL, simplifyDataFrame = TRUE)$resultSet$headers
 
 # The data in this JSON are:
 # "PLAYER_ID": Unique ID to each player
@@ -182,35 +187,103 @@ playerData <- fromJSON(playerURL, simplifyDataFrame = TRUE)
 # we need to get that information via scraping
 
 # Centers, Forwards, and Guards
-urlCodes = c("C", "F", "G")
+urlCodes <- c("C", "F", "G")
 
-extractedPlayerStats = data.frame()
-playerStats = data.frame()
+extractedPlayerStats <- data.frame()
 
+# For each position, get their stats
 for (i in 1:length(urlCodes)) {
   
+  # Open the page
   tempURL <- paste0("https://stats.nba.com/players/traditional/?PlayerPosition=", urlCodes[i], "&sort=PTS&dir=-1&SeasonType=Regular%20Season")
   rd$open(silent = TRUE)
   rd$navigate(tempURL)
   
+  # Wait a while
+  Sys.sleep(5)
+  
   playerPage <- rd$getPageSource() %>% str_flatten() %>% read_html()
   
+  # Get the headers
   visibleHeaders_Player <- getHeaders(playerPage)
   
-  tempStats <- getData(playerPage, visibleHeaders_Player) %>% 
-    mutate("POSITION" = urlCodes[i])
+  # Number of pages
+  numPages <- playerPage %>% html_node("div.stats-table-pagination__info") %>% html_text() %>% str_split("of ") %>% unlist()
+  numPages <- numPages[length(numPages)] %>% trimws() %>% as.numeric()
+   
+  # If numPages > 1, there's a "next" button that will need to be clicked
+  if (numPages > 1) {
+    nextButton <- rd$findElement("css selector", "a.stats-table-pagination__next")
+  }
   
-  playerStats = rbind(playerStats, tempStats)
-
-  # This dataset needs to be joined to playerData via the player names so that positions can be associated with the name
+  for (j in 1:numPages) {
+   
+   if (j > 1) {
+     nextButton$clickElement()
+     Sys.sleep(5)
+     playerPage <- rd$getPageSource() %>% str_flatten() %>% read_html()
+     nextButton <- rd$findElement("css selector", "a.stats-table-pagination__next")
+   }
+    
+    extractedStats_Player <- getData(playerPage, visibleHeaders_Player)
+    extractedStats_Player <- extractedStats_Player %>% mutate("POSITION" = urlCodes[i])
+    
+    extractedPlayerStats <- rbind(extractedPlayerStats, extractedStats_Player)
+    
+  }
+  
 }
 
-playerStats <- playerStats %>% 
-  rename(RANK.POS = RANK) %>% 
-  as.data.table(.) %>% 
-  arrange(desc(PTS))  %>% 
-  as.data.frame()
+# "POSITION" was created in the loop, so it should be added to visibleHeaders_Player
+visibleHeaders_Player <- c(visibleHeaders_Player, "POSITION")
 
-visibleHeaders = getHeaders(playerPage)
-visibleHeaders = c(visibleHeaders, "POSITION")
+
+# This dataset needs to be joined to playerData 
+# We can use the player names so that positions can be associated with the name
+# We'll use left_join because extractedPlayerStats is much bigger than playerData
+
+# First, we have to change the name of RANK because it's not the same as playerData's RANK
+extractedPlayerStats <- extractedPlayerStats %>% rename(POS.RANK = RANK)
+
+# Next, we need to convert columns that are classified as matricies into character classes
+for (i in 1:ncol(extractedPlayerStats)) {
+    extractedPlayerStats[[i]] <- extractedPlayerStats[[i]] %>% as.character()
+}
+
+# making new df so that we don't modify extractedPlayerStats after scraping so that we can 
+# adjust as we need to without rescraping
+playerStats <- extractedPlayerStats %>% 
+  
+  left_join(., playerData) %>% 
+  
+  # modifying a few cols that had 2 cols representing same value & to fill in NAs
+  mutate(FG3_PCT = case_when(
+    is.null(X3P.) ~ as.numeric(FG3_PCT) * 100,
+    TRUE ~ as.numeric(X3P.))) %>% 
+  
+  mutate(`3PA` = case_when(
+    is.null(X3PA) ~ as.numeric(FG3A),
+    TRUE ~ as.numeric(X3PA))) %>% 
+  
+  mutate(`3PM` = case_when(
+    is.null(X3PM) ~ as.numeric(FG3M),
+    TRUE ~ as.numeric(X3PM))) %>% 
+  
+  mutate(FG_PCT = case_when(
+    is.null(`FG.`) ~ as.numeric(FG_PCT) * 100,
+    TRUE ~ as.numeric(`FG.`))) %>%
+  
+  mutate(FT_PCT = case_when(
+    is.null(`FT.`) ~ as.numeric(FT_PCT) * 100,
+    TRUE ~ as.numeric(`FT.`))) %>% 
+  
+  # sorting in a regular order, omitting duplic cols
+  select(POS.RANK, PLAYER, TEAM, AGE, GP, W, L, MIN, PTS, FGM, FGA, FG_PCT,
+         `3PA`, `3PM`, FG3_PCT, FTM, FTA, FT_PCT, OREB, DREB, REB, AST, TOV, STL, BLK,
+         PF, FP, DD2, TD3, X..., POSITION, PLAYER_ID, RANK) %>% 
+  
+  # mutating numerics
+  mutate_at(vars(-PLAYER, -TEAM, -POSITION), funs(as.numeric)) %>% 
+  
+  arrange(desc(PTS))
 
