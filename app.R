@@ -44,47 +44,75 @@ if (interactive()) {
           "input$tabs == 'tab'",
           pickerInput(
             inputId = "xcol",
-            label = "X Variable",
-            options = list(`actions-box` = TRUE),
+            label = "Choose teams",
             multiple = T,
             choices = sort(unique(playerStats$TEAM)),
-            selected = playerStats$TEAM
+            selected = playerStats$TEAM,
+            options = list(
+              `selected-text-format` = "count > 1",
+              `actions-box` = TRUE),
+            choicesOpt = list(
+              style = rep(("color: black; background: white;"), 100))
           ),
-          prettyCheckbox(
-            inputId = "three_pt_acc",
-            label = "Shoots above avg % from 3",
-            status = 'info',
-            shape = "curve",
-            inline = FALSE
-          ),
-          prettyCheckbox(
-            inputId = "three_pt_att",
-            label = "Shoots more 3s than avg",
-            status = 'info',
-            shape = "curve",
-            inline = FALSE
-          ),
-          prettyCheckbox(
-            inputId = "game_sample",
-            label = "Played at least 75% of the games",
-            status = 'info',
-            shape = "curve",
-            inline = FALSE
-          ),
-          prettyCheckbox(
-            inputId = "scores20",
-            label = "Scores > 20 PPG",
-            status = 'info',
-            shape = "curve",
-            inline = FALSE
-          ),
-          prettyCheckbox(
-            inputId = "winning_team",
-            label = "Team wins > 50% of games",
-            status = 'info',
-            shape = "curve",
-            inline = FALSE
-          ),
+          
+          pickerInput(
+            inputId = "good_shooter",
+            label = "Filter for good shooters",
+            multiple = TRUE,
+            choices = list(
+              `Overall Shooting` = c(
+                "Has above average FG%", 
+                "Shoots more than avg"),
+              `3-point Specialists` = c(
+                "Shoots above avg % from 3",
+                "Shoots more 3s than avg"),
+              `2-point Specilists` = c(
+                "Shoots above avg % from 2",
+                "Shoots more 2s than avg")
+              ),
+            selected = NULL,
+            options = list(
+              `selected-text-format` = "count > 1",
+              `actions-box` = TRUE),
+            choicesOpt = list(
+              style = rep(("color: black; background: white;"), 100))
+            ),
+          
+          pickerInput(
+            inputId = "high_avgs",
+            label = "Filter for elite performers",
+            multiple = TRUE,
+            choices = list(
+              `Is in the 95th percentile for:` = c(
+                "Points", 
+                "Rebounds",
+                "Assists")
+            ),
+            selected = NULL,
+            options = list(
+              `selected-text-format` = "count > 1",
+              `actions-box` = TRUE),
+            choicesOpt = list(
+              style = rep(("color: black; background: white;"), 100))
+          ),  
+          
+          pickerInput(
+            inputId = "threshold",
+            label = "Filter for threshold check",
+            multiple = TRUE,
+            choices = list(
+              `Thresholds` = c(
+                "Has played 75% of possible games", 
+                "Team wins at least 50% of the games when player plays")
+            ),
+            selected = NULL,
+            options = list(
+              `selected-text-format` = "count > 1",
+              `actions-box` = TRUE),
+            choicesOpt = list(
+              style = rep(("color: black; background: white;"), 100))
+          ), 
+
 
 
           # trigger mechanism so we don't constantly load new data on each input change
@@ -227,7 +255,40 @@ if (interactive()) {
                 # max width = 12, so since this is 12 it will span the whole body
                 width = 12
               ) # end box
-            ) # end second fluid row
+            ), # end second fluid row
+            
+            # begin third fluid row
+            fluidRow(
+              box(
+                # example of how to change box colors
+                # just change the #82382f to whatever color you want
+                tags$style(
+                  HTML(
+                    "
+                      .box.box-solid.box-primary>.box-header {
+                      color:#fff;
+                      background:#82382f
+                      }
+                      .box.box-solid.box-primary{
+                      border-bottom-color:#82382f;
+                      border-left-color:#82382f;
+                      border-right-color:#82382f;
+                      border-top-color:#82382f;
+                      }"
+                  )
+                ),
+                solidHeader = TRUE,
+                status = "primary",
+                title = "Filtered Data2",
+                # div(...) is another example of output we can do in a box
+                div(
+                  style = "overflow-x:scroll",
+                  DT::dataTableOutput("dataexample2")
+                ),
+                # max width = 12, so since this is 12 it will span the whole body
+                width = 12
+              ) # end box
+            ) # end second third row
           ) # end well panel
         }
 
@@ -300,49 +361,129 @@ if (interactive()) {
         playerStats %>%
           filter(TEAM %in% teams_selected) %>%
           filter(
-            if (input$three_pt_acc == TRUE) {
-              X3P. > mean(playerStats$X3P.)
-            } else {
-              X3P. == X3P.
+            if ("Shoots above avg % from 3" %in% c(input$good_shooter) == TRUE) {
+              FG3_PCT > sum(playerStats$`3PM`)/sum(playerStats$`3PA`) * 100
+            } 
+            else {
+              FG3_PCT == FG3_PCT
             }
           ) %>%
           filter(
-            if (input$three_pt_att == TRUE) {
-              X3PA > mean(playerStats$X3PA)
-            } else {
-              X3PA == X3PA
+            if ("Shoots more 3s than avg" %in% c(input$good_shooter) == TRUE) {
+              `3PA` > mean(playerStats$`3PA`)
+            }
+            else {
+              `3PA` == `3PA`
             }
           ) %>%
           filter(
-            if (input$game_sample == TRUE) {
-              GP >= .75*mean(playerStats$GP)
-            } else {
-              GP == GP
+            if ("Shoots above avg % from 2" %in% c(input$good_shooter) == TRUE) {
+              FG2_PCT > sum(playerStats$`2PM`)/sum(playerStats$`2PA`) * 100
+            } 
+            else {
+              FG2_PCT == FG2_PCT
             }
           ) %>%
           filter(
-            if (input$scores20 == TRUE) {
-              PTS > 20
-            } else {
+            if ("Shoots more 2s than avg" %in% c(input$good_shooter) == TRUE) {
+              `2PA` > mean(playerStats$`2PA`)
+            }
+            else {
+              `2PA` == `2PA`
+            }
+          ) %>%
+          filter(
+            if ("Has above average FG%" %in% c(input$good_shooter) == TRUE) {
+              FG_PCT > sum(playerStats$FGM)/sum(playerStats$FGA) * 100
+            } 
+            else {
+              FG_PCT == FG_PCT
+            }
+          ) %>%
+          filter(
+            if ("Shoots more than avg" %in% c(input$good_shooter) == TRUE) {
+              FGA > mean(playerStats$FGA)
+            } 
+            else {
+              FGA == FGA
+            }
+          ) %>%
+          filter(
+            if ("Points" %in% c(input$high_avgs) == TRUE) {
+              PTS >= quantile(playerStats$PTS, .95)
+            }
+            else {
               PTS == PTS
             }
           ) %>%
           filter(
-            if (input$winning_team == TRUE) {
+            if ("Rebounds" %in% c(input$high_avgs) == TRUE) {
+              REB >= quantile(playerStats$REB, .95)
+            } 
+            else {
+              REB == REB
+            }
+          ) %>%
+          filter(
+            if ("Assists" %in% c(input$high_avgs) == TRUE) {
+              AST >= quantile(playerStats$AST, .95)
+            } 
+            else {
+              AST == AST
+            }
+          ) %>%
+          filter(
+            if ("Has played 75% of possible games" %in% c(input$threshold) == TRUE) {
+              GP > quantile(playerStats$GP, .75)
+            } 
+            else {
+              GP == GP
+            }
+          ) %>%
+          filter(
+            if ("Team wins at least 50% of the games when player plays" %in% c(input$threshold) == TRUE) {
               W / GP > .5
-            } else {
+            }
+            else {
               GP == GP
             }
           )
       })
-
+      
+      
+ 
       output$dataexample <- DT::renderDataTable({
         dataFilt <- playerData() %>%
-          select(POSITION, RANK.POS, PLAYER, TEAM, PTS, REB, AST, X3P., GP, W, L) %>%
+          select(POSITION, PLAYER, TEAM, PTS, REB, AST, FG3_PCT, GP, W, L) %>%
           filter(TEAM %in% as.list(input$xcol))
         
         DT::datatable(
           data = dataFilt,
+          escape = FALSE,
+          options = list(lengthMenu = c(10, 10, -1), scrollY = "250px"))
+      })
+      
+
+      dataFilt2 <- eventReactive(input$update, {
+        playerData() %>% 
+          group_by(POSITION) %>% 
+          summarize(
+            `N` = n(),
+            `Points` = round(mean(PTS), 2),
+            `Rebounds` = round(mean(REB), 2),
+            `Assists` = round(mean(AST), 2),
+            `FT%` = round(sum(FTM)/sum(FTA)*100, 2),
+            `FG%` = round(sum(FGM)/sum(FGA)*100, 2),
+            `2Pt%` = round(sum(`2PM`)/sum(`2PA`)*100, 2),
+            `3Pt%` = round(sum(`3PM`)/sum(`3PA`)*100, 2),
+            `% of Pts From FTs` = round(sum(`FTM`)/sum(PTS)*100, 2),
+            `% of Pts From 2s` = round(sum(`2PM`*2)/sum(PTS)*100, 2),
+            `% of Pts From 3s` = round(sum(`3PM`*3)/sum(PTS)*100, 2)
+        )
+      })
+      output$dataexample2 <- DT::renderDataTable({
+        DT::datatable(
+          data = dataFilt2(),
           escape = FALSE,
           options = list(lengthMenu = c(10, 10, -1), scrollY = "250px"))
       })
@@ -359,22 +500,39 @@ if (interactive()) {
       })
 
       output$timeseries <- renderPlotly(
-        fig <- plot_ly(
-          type = "scatter",
-          data = playerData(),
-          x = ~REB,
-          y = ~AST,
-          group = ~POSITION,
-          color = ~POSITION,
-          size = ~PTS,
-          text = paste(
-            "Player: ", playerData()$PLAYER,
-            "<br>Points: ", playerData()$PTS,
-            "<br>Team: ", playerData()$TEAM
-          ),
-          hoverinfo = text,
-          mode = "markers"
-        )
+        if(nrow(playerData()) > 1){
+          fig <- plot_ly(
+            type = "scatter",
+            data = playerData(),
+            x = ~REB,
+            y = ~AST,
+            color = ~POSITION,
+            size = ~PTS,
+            text = paste(
+              "Player: ", playerData()$PLAYER,
+              "<br>Points: ", playerData()$PTS,
+              "<br>Team: ", playerData()$TEAM
+            ),
+            hoverinfo = text,
+            mode = "markers"
+          )
+        }
+        else{
+          fig <- plot_ly(
+            type = "scatter",
+            data = playerData(),
+            x = ~REB,
+            y = ~AST,
+            size = ~PTS,
+            text = paste(
+              "Player: ", playerData()$PLAYER,
+              "<br>Points: ", playerData()$PTS,
+              "<br>Team: ", playerData()$TEAM
+            ),
+            hoverinfo = text,
+            mode = "markers"
+          )
+        }
       )
       ### end of making the output for the box with the time series ###
 
@@ -409,3 +567,4 @@ if (interactive()) {
     } # close out server
   ) # close out shinyApp()
 }
+

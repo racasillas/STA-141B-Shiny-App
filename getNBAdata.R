@@ -275,15 +275,40 @@ playerStats <- extractedPlayerStats %>%
   
   mutate(FT_PCT = case_when(
     is.null(`FT.`) ~ as.numeric(FT_PCT) * 100,
-    TRUE ~ as.numeric(`FT.`))) %>% 
-  
-  # sorting in a regular order, omitting duplic cols
-  select(POS.RANK, PLAYER, TEAM, AGE, GP, W, L, MIN, PTS, FGM, FGA, FG_PCT,
-         `3PA`, `3PM`, FG3_PCT, FTM, FTA, FT_PCT, OREB, DREB, REB, AST, TOV, STL, BLK,
-         PF, FP, DD2, TD3, X..., POSITION, PLAYER_ID, RANK) %>% 
+    TRUE ~ as.numeric(`FT.`))) %>%
   
   # mutating numerics
   mutate_at(vars(-PLAYER, -TEAM, -POSITION), funs(as.numeric)) %>% 
   
+  # making some point breakdowns for each player
+  # 2PA and 2PM are two-pointers shot & made
+  # 2(3)PT_ATT_PER calculates their 2(3) point attempts per game
+  # PER_PTS_XX calculates the % of points per game from FT, 3P, and 2P 
+  mutate(
+    `2PA` = FGA - `3PA`,
+    `2PM` = FGM - `3PM`,
+    `FG2_PCT` = round((`2PM`/`2PA`)*100, 2), 
+    `2PT_ATT_PER` = round((`2PA`/FGA)*100, 2),
+    `3PT_ATT_PER` = round((`3PA`/FGA)*100, 2),
+    PER_PTS_FT = round((FTM/PTS)*100, 2),
+    PER_PTS_3P = round(((`3PM`*3)/PTS)*100, 2), 
+    PER_PTS_2P = round(((`2PM`*2)/PTS)*100, 2)
+    
+  ) %>% 
+
+  # sorting in a regular order, omitting duplic cols
+  select(POS.RANK, PLAYER, TEAM, AGE, GP, W, L, MIN, PTS, FGM, FGA, FG_PCT,
+        `2PA`, `2PM`, `FG2_PCT`, `3PA`, `3PM`, FG3_PCT, `2PT_ATT_PER`, `3PT_ATT_PER`, 
+         FTM, FTA, FT_PCT, PER_PTS_FT, PER_PTS_3P, PER_PTS_2P, OREB, DREB, 
+         REB, AST, TOV, STL, BLK, PF, FP, DD2, TD3, X..., POSITION, PLAYER_ID, RANK) %>% 
+  
   arrange(desc(PTS))
+
+# > sum(playerStats$FTM)/sum(playerStats$PTS)*100
+# [1] 15.93956
+# > sum(playerStats$`3PM`*3)/sum(playerStats$PTS)*100
+# [1] 31.5128
+# > sum(playerStats$`2PM`*2)/sum(playerStats$PTS)*100
+# [1] 52.62826
+
 
