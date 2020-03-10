@@ -295,20 +295,42 @@ playerStats <- extractedPlayerStats %>%
     PER_PTS_2P = round(((`2PM`*2)/PTS)*100, 2)
     
   ) %>% 
+  
+  mutate(
+    POSITION =
+      case_when(
+        POSITION == "G" ~"Guard", 
+        POSITION == "C" ~"Center",
+        TRUE ~"Forward")
+    ) %>% 
 
   # sorting in a regular order, omitting duplic cols
   select(POS.RANK, PLAYER, TEAM, AGE, GP, W, L, MIN, PTS, FGM, FGA, FG_PCT,
         `2PA`, `2PM`, `FG2_PCT`, `3PA`, `3PM`, FG3_PCT, `2PT_ATT_PER`, `3PT_ATT_PER`, 
-         FTM, FTA, FT_PCT, PER_PTS_FT, PER_PTS_3P, PER_PTS_2P, OREB, DREB, 
+         FTM, FTA, FT_PCT, PER_PTS_FT, PER_PTS_2P, PER_PTS_3P, OREB, DREB, 
          REB, AST, TOV, STL, BLK, PF, FP, DD2, TD3, X..., POSITION, PLAYER_ID, RANK) %>% 
   
   arrange(desc(PTS))
 
-# > sum(playerStats$FTM)/sum(playerStats$PTS)*100
-# [1] 15.93956
-# > sum(playerStats$`3PM`*3)/sum(playerStats$PTS)*100
-# [1] 31.5128
-# > sum(playerStats$`2PM`*2)/sum(playerStats$PTS)*100
-# [1] 52.62826
 
 
+cols <- RColorBrewer::brewer.pal(length(unique(playerStats$POSITION)), name = "Dark2")
+
+
+playerStats <- playerStats %>% 
+  mutate(color = factor(playerStats$POSITION, labels = cols))
+
+
+require(teamcolors)
+pal <- league_pal("nba") %>% 
+  as.data.frame() %>% 
+  mutate(
+    TEAM= 
+      c("ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
+        "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
+        "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS"
+      )
+  ) %>% 
+  rename(team_color = ".")
+
+playerStats <- merge(playerStats, pal, by = "TEAM")
