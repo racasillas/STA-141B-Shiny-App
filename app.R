@@ -632,7 +632,8 @@ if (interactive()) {
         input$update, {
           temp <- playerData() %>% 
             group_by(TEAM) %>% 
-            summarize(n = n(),
+            # n_distinct to avoid repeats of players if they play > 1 position
+            summarize(n = n_distinct(PLAYER),
                       col = unique(team_color, TEAM))
           temp$TEAM <- reorder(temp$TEAM, temp$n)
           temp
