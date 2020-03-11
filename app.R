@@ -22,13 +22,13 @@ if (interactive()) {
       ),
       titleWidth = 250
     ) # we can make an image in the header if we want to (like the NBA or something)
-
+  
   # making the sidebar
   sidebar <- dashboardSidebar(
     width = 250,
     sidebarMenu(
       id = "tabs",
-
+      
       # create first menu item (aka panel on the left)
       menuItem(
         "Players",
@@ -56,7 +56,7 @@ if (interactive()) {
               style = rep(("color: black; background: white;"), 100)
             )
           ),
-
+          
           pickerInput(
             inputId = "good_shooter",
             label = "Filter for good shooters",
@@ -84,7 +84,7 @@ if (interactive()) {
               style = rep(("color: black; background: white;"), 100)
             )
           ),
-
+          
           pickerInput(
             inputId = "high_avgs",
             label = "Filter for elite performers",
@@ -107,14 +107,14 @@ if (interactive()) {
               style = rep(("color: black; background: white;"), 100)
             )
           ),
-
+          
           pickerInput(
             inputId = "threshold",
             label = "Filter for threshold check",
             multiple = TRUE,
             choices = list(
               `Thresholds` = c(
-                "Has played 75% of possible games",
+                "Has played 50% of possible games",
                 "Team wins at least 50% of the games when player plays"
               )
             ),
@@ -127,7 +127,7 @@ if (interactive()) {
               style = rep(("color: black; background: white;"), 100)
             )
           ),
-
+          
           # trigger mechanism so we don't constantly load new data on each input change
           actionButton(
             inputId = "update",
@@ -136,44 +136,39 @@ if (interactive()) {
           )
         ) # end conditional panel
       ), # end first menu item
-
+      
       # makes the second "tab"
       menuItem(
-        "Menu item 2",
+        "Shooting Statistics",
         expandedName = "tab2",
         icon = icon("user-friends"),
         tags$style(".fa-user-friends {color:#3333f3}"),
-        sliderInput(
-          inputId = "slider",
-          label = "Some Filter",
-          min = 0,
-          max = 10,
-          value = 0
-        ),
-        sliderInput(
-          inputId = "slider2",
-          label = "Some Filter 2",
-          min = 0,
-          max = 650,
-          value = 0
-        ),
         selectInput(
-          inputId = "progress",
-          label = "Progress",
-          choices = c(
-            "0%" = 0, "20%" = 20, "40%" = 40, "60%" = 60, "80%" = 80,
-            "100%" = 100
-          )
+          inputId = "year",
+          label = "Year: ",
+          choices = c(unique(shootingStats_year$YEAR)),
+          multiple = FALSE
+        ),
+        selectInput("players", "Choose a Player:",
+                    choices = "",
+                    selected = c("2019-20")
+        ),
+        checkboxGroupInput(inputId = "checkBox",
+                           label = "choose range: ",
+                           choices = c("Close Range", "Mid Range", "Deep Shot")),
+        actionButton(
+          inputId = "update2",
+          label = "Update Data",
+          icon = icon("rocket")
         )
       ) # end second tab
-    )
-  ) # end sidebar creation
-
+    )) # end sidebar creation
+  
   # creating the body
   body <- dashboardBody(
     
     uiOutput("body"),
-
+    
     # all of this is just color customization for the header
     # it can be whatever we want this is just filler for now
     tags$head(tags$style(
@@ -202,18 +197,18 @@ if (interactive()) {
       )
     ))
   ) # end color customization
-
-
+  
+  
   shinyApp(
     # making the UI a component of the header we created earlier, the sidebar we created earlier, and the body created below
     ui = 
       
       dashboardPagePlus(header,
-      sidebar,
-      body,
-      skin = "blue"
-    ),
-
+                        sidebar,
+                        body,
+                        skin = "blue"
+      ),
+    
     server = function(input, output, session) {
       # suppress warnings  
       storeWarn<- getOption("warn")
@@ -254,7 +249,6 @@ if (interactive()) {
                   title = "Summary Stats by Position",
                   # div(...) is another example of output we can do in a box
                   div(
-                    style = "overflow-x:scroll",
                     DT::dataTableOutput("summarydata")
                   ),
                   # max width = 12, so since this is 12 it will span the whole body
@@ -315,7 +309,6 @@ if (interactive()) {
                 title = "Filtered Data",
                 # div(...) is another example of output we can do in a box
                 div(
-                  style = "overflow-x:scroll",
                   DT::dataTableOutput("dataexample")
                 ),
                 # max width = 12, so since this is 12 it will span the whole body
@@ -324,70 +317,38 @@ if (interactive()) {
             ) # end third fluid row
           ) # end well panel
         }
-
+        
         # if users click second tab, this is the output that will be shown
         else if (input$sidebarItemExpanded == "tab2") {
           # wellPanel creates the backing to contain all the fluidRow arguments
           wellPanel(
             # begin fluidrow
             fluidRow(
-              # begin first column, which will separate the fluidRow into vertical sections
-              # since width  = 6, it will be half of the fluidRow
-              column(
-                6,
-                infoBox(
-                  "Number of Players", uiOutput("orderNum2"), "Subtitle",
-                  icon = icon("users"), width = 12
-                ),
-                valueBox(
-                  uiOutput("orderNum"), "Number of Teams",
-                  icon = icon("credit-card"), width = 12,
-                  href = "http://google.com"
-                ),
-                box(
-                  title = "Progress example",
+              infoBox(
+                "Player's Name", textOutput("orderNum"), width = 12
+              )
+            ),
+            fluidRow(
+              # begin column of fluid row
+              box(title = "# of Different-Range Shooting",
                   width = 12,
-                  background = "red",
-                  uiOutput("progress")
-                )
-                # the infoBox, valueBox, and box components above this are all in the same column, so they'll be stacked
-                # the width of each is 12, so they will be the max width of the column (which is 6, so they'll all be half of the fluidRow)
-              ), # end column
-
-              # begin second column of fluid row, which will be the second vertical section
-              column(
-                6,
-                box(
-                  title = "Histogram box title",
-                  width = 12,
-                  status = "warning", solidHeader = TRUE, collapsible = TRUE,
-                  plotlyOutput("plot", height = 275)
-                )
+                  # status = "warning", 
+                  solidHeader = TRUE, 
+                  collapsible = TRUE,
+                  plotlyOutput("shooting_plot")
               )
             ), # end fluidrow
-
+            
             # begin next fluidRow, mainly used to show how we can have different horizontal and vertical sections for output
             fluidRow(
-              box(
-                title = "extra box",
-                width = 12,
-                status = "primary",
-                solidHeader = TRUE,
-                h4("Everything above this is one 'fluidRow'. fluidRow will be how the boxes are grouped horizontally. 
-                     The three smaller boxes to the left of the graph are grouped by 1 'column' of the fluidRow, and the
-                     graph is the second column of the fluidRow. Columns can separate fluidRows vertically. Most shiny
-                     elements have a max width of 12, so you can separate a fluidRow that is length 12 by 2 columns that 
-                     are each 6 units wide, as above. The box that this text is in in length 12 so it's as wide as it
-                     can be."),
-                h4("These are just a few examples of how we can layout the app. Once we have the data, we can draw out 
-                     how we want the app to look and which panels we want to have what data, and I can help design it from there")
-              )
+              dataTableOutput("shooting_percentages")
             )
+            
           )
         }
       }) # end output$body
-
-
+      
+      
       ## this is where the checkboxes come into play ##
       playerData <- eventReactive(input$update, {
         teams_selected <- as.list(input$xcol)
@@ -483,8 +444,8 @@ if (interactive()) {
             }
           ) %>%
           filter(
-            if ("Has played 75% of possible games" %in% c(input$threshold) == TRUE) {
-              GP > quantile(playerStats$GP, .75)
+            if ("Has played 50% of possible games" %in% c(input$threshold) == TRUE) {
+              GP > quantile(playerStats$GP, .50)
             }
             else {
               GP == GP
@@ -499,9 +460,9 @@ if (interactive()) {
             }
           )
       })
-
-
-
+      
+      
+      
       output$dataexample <- DT::renderDataTable({
         dataFilt <- playerData() %>%
           rename(
@@ -512,7 +473,7 @@ if (interactive()) {
           ) %>%
           filter(TEAM %in% as.list(input$xcol)) %>% 
           arrange(desc(PTS))
-
+        
         DT::datatable(
           data = dataFilt,
           escape = FALSE,
@@ -524,8 +485,8 @@ if (interactive()) {
           class = "cell-border stripe"
         )
       })
-
-
+      
+      
       dataFilt2 <- eventReactive(input$update, {
         mydf <- playerData() %>%
           group_by(POSITION) %>%
@@ -564,37 +525,37 @@ if (interactive()) {
           class = "cell-border stripe"
         )
       })
-
+      
       output$scatter <- renderPlotly(
         if (nrow(playerData()) > 1) {
-
+          
           fig <- plot_ly()
           for (i in unique(playerData()$POSITION)) {
             tempDat <- playerData() %>% 
               filter(POSITION == i) 
             fig <- add_trace(fig, 
-                           data = tempDat, 
-                           y = ~AST, 
-                           x = ~REB, 
-                           size = ~PTS,
-                           color = ~POSITION,
-                           text = paste(
-                             "Player: ",  tempDat$PLAYER,
-                             "<br>Points: ",  tempDat$PTS,
-                             "<br>Team: ",  tempDat$TEAM
-                           ),
-                           hoverinfo = paste("Player", tempDat$PLAYER),
-                           type = 'scatter', 
-                           mode = 'markers',
-                           marker = list(color = ~color,
-                                         line = list(
-                                           color = ~color,
-                                           width = 2
+                             data = tempDat, 
+                             y = ~AST, 
+                             x = ~REB, 
+                             size = ~PTS,
+                             color = ~POSITION,
+                             text = paste(
+                               "Player: ",  tempDat$PLAYER,
+                               "<br>Points: ",  tempDat$PTS,
+                               "<br>Team: ",  tempDat$TEAM
+                             ),
+                             hoverinfo = paste("Player", tempDat$PLAYER),
+                             type = 'scatter', 
+                             mode = 'markers',
+                             marker = list(color = ~color,
+                                           line = list(
+                                             color = ~color,
+                                             width = 2
                                            )
-                                         )
-                           )
+                             )
+            )
           }
-
+          
           fig 
         }
         else {
@@ -639,7 +600,7 @@ if (interactive()) {
           temp
           
         })
-                                
+      
       output$histogram <- renderPlotly(
         plot_ly(dataHist(),
                 x = ~TEAM, 
@@ -648,38 +609,96 @@ if (interactive()) {
                 marker = list(color = ~col)) %>% 
           layout(
             yaxis =  list(title = "Number of Players")
-            )
+          )
       ) 
       ### end of making the output for the box with the time series ###
-
-
-
+      
+      
+      
+      
+      
+      
       ### below this is the output for the second tab ###
-
-      # reactive to the first slider
+      
+      
+      shootingData <- eventReactive(input$update2, {
+        shootingStats 
+      })
+      headerData <- eventReactive(input$update2, {
+        temp <- shootingStats %>% 
+          filter(Player == input$players, YEAR == input$year)
+        as.data.frame(temp)
+      })
+      
+      observeEvent(input$year,{
+        dat <- shootingStats %>% 
+          filter(YEAR == input$year) %>% 
+          select(Player)
+        if(is.null(input$year)){
+          updateSelectInput(session,'players',
+                            choices= c("dat$Player"))
+        }
+        else{
+          updateSelectInput(session,'players',
+                            choices= c(dat$Player))
+        }
+      }) 
+      # 
+      # reactive to the second slider
       output$orderNum <- renderText({
-        prettyNum(input$slider, big.mark = ",")
+        (headerData()$Player)
       })
-
+      
+      
       # reactive to the second slider
-      output$orderNum2 <- renderText({
-        prettyNum(input$slider2, big.mark = ",")
+      output$shooting_plot <- renderPlotly({
+        
+        data = shootingData() %>% 
+          filter(YEAR == input$year) %>%
+          filter(Player == input$players)
+        data <- data.frame(x = c("LESS THAN 5FT.", "5-9 FT.", "10-14 FT.", "15-19 FT.", "20-24 FT.", "25-29 FT."),
+                           y = c(data$`FG.`, data$`FG..1`, data$`FG..2`, data$`FG..3`, data$`FG..4`, data$`FG..5`))
+        data$x <- factor(data$x, levels = c("LESS THAN 5FT.", "5-9 FT.", "10-14 FT.", "15-19 FT.", "20-24 FT.", "25-29 FT."))
+        
+        if (nrow(data) == 0){
+          return(NULL)
+        }
+        p <- data %>% plot_ly(x = ~x,
+                              y = ~y, 
+                              type = 'bar',
+                              color = ~x) %>%
+          layout(title = 'Range Bar Chart',
+                 xaxis = list(title = 'Distance'),
+                 yaxis = list(title = '%'))
       })
-
-      # reactive to the second slider
-      output$plot <- renderPlotly({
-        plot_ly(x = ~ rnorm(input$slider2), type = "histogram")
+      
+      
+      
+      shootingPercentages <- eventReactive(input$update2, {
+        dataset = shootingStats %>% 
+          filter(YEAR == input$year) %>% 
+          filter(Player == input$players)
       })
-
-      # reactive to the value for the "Progress"
-      output$progress <- renderUI({
-        iconName <- switch(input$progress,
-          "100" = "ok",
-          "0" = "remove",
-          "road"
-        )
-        p("Current progress is: ", icon(iconName, lib = "glyphicon"))
-      })
+      
+      # reactive 
+      output$shooting_percentages = isolate(renderDataTable({
+        
+        if (nrow(shootingPercentages()) == 0){
+          return(NULL)
+        }
+        shootingPercentages() %>%
+          summarize(
+            `Close Range` = paste0(round((FGM+FGM.1)/(FGA+FGA.1) * 100, 2), "%"),
+            `Mid Range` = paste0(round((FGM.2+FGM.3)/(FGA.2+FGA.3)* 100,2), "%"),
+            `Deep Shot` = paste0(round((FGM.4+FGM.5)/(FGA.4+FGA.5)* 100,2), "%")
+          ) %>%
+          select(c(input$checkBox)) 
+      }, options = list(
+        paging = F, 
+        searching = F,
+        bInfo = F)))
+      
     } # close out server
   ) # close out shinyApp()
 }
+
