@@ -24,41 +24,41 @@ shootingURL <- "https://raw.githubusercontent.com/A10theHero/technicallyADatabas
 # Extracts from a URL
 
 rawExtract <- function(url) {
-
-
+  
+  
   # Read in the raw file and remove the tab characters
   # Note: This introduces a new column that's just numbered according to the number of rows
   dat <- read_lines(url) %>% str_split(fixed("\t"))
-
-
+  
+  
   # Save the column names to a separate variable
   # Note: \" is still in these variables, but knowing their length is important
   dat.names <- dat[[1]]
-
-
+  
+  
   # Next, remove the \" characters
   dat <- dat %>%
     unlist() %>%
     str_remove_all('\"')
-
-
+  
+  
   # Update the colnames and remove them from dat
   dat.names <- dat[1:length(dat.names)]
   dat <- dat[(length(dat.names) + 1):length(dat)]
-
-
+  
+  
   # Convert the data into a matrix, with ncol = length(dat.names) + 1 (for the extra column introduced earlier)
   dat <- dat %>% matrix(ncol = length(dat.names) + 1, byrow = TRUE)
-
-
+  
+  
   # Remove that extra column
   dat <- dat[, 2:ncol(dat)]
-
-
+  
+  
   # Add the column names to dat
   colnames(dat) <- dat.names
-
-
+  
+  
   # Return the matrix as a data frame
   return(data.frame(dat, stringsAsFactors = FALSE))
 }
@@ -98,7 +98,7 @@ playerStats <- playerStats %>%
     FTM, FTA, FT_PCT, PER_PTS_FT, PER_PTS_2P, PER_PTS_3P, OREB, DREB,
     REB, AST, TOV, STL, BLK, PF, FP, DD2, TD3, X..., POSITION, PLAYER_ID, RANK
   ) %>%
-
+  
   arrange(desc(PTS))
 
 
@@ -135,7 +135,8 @@ shootingStats <- rawExtract(shootingURL)
 shootingStats <- shootingStats %>%
   mutate_at(vars(-Player, -TEAM, -YEAR), funs(as.numeric))
 
-
+# making the header
+header = headerPanel("NBA Visualization")
 
 
 # making the sidebar
@@ -145,17 +146,16 @@ sidebar <-
     tabsetPanel(
       id = "tabs",
       tabPanel("Players",
-        icon = icon("basketball-ball")
+               icon = icon("basketball-ball")
       ),
-
+      
       tabPanel("Shooting Stats",
-        icon = icon("user-friends")
+               icon = icon("user-friends")
       )
     ),
     width = 250
   )
 
-header <- headerPanel("NBA Visualization")
 
 
 # creating the body
@@ -165,12 +165,12 @@ body <- uiOutput("body")
 shinyApp(
   # making the UI a component of the header we created earlier, the sidebar we created earlier, and the body created below
   ui <- fluidPage(header,
-    sidebar,
-    body
+                  sidebar,
+                  body
   ),
   server = function(input, output, session) {
-
-      
+    
+    
     # suppress warnings
     storeWarn <- getOption("warn")
     options(warn = -1)
@@ -178,191 +178,200 @@ shinyApp(
     output$body <- renderUI({
       # render this output when they choose the first tab
       if (input$tabs == "Players") {
+        tags$head(tags$style(
+          HTML('
+         #sidebar {
+            background-color: #00000;
+        }
+        body, label, input, button, select { 
+          font-family: "Arial";
+        }')
+        ))
         sidebarLayout(
-          sidebarPanel(width = 2,
-            pickerInput(
-              inputId = "xcol",
-              label = "Choose teams",
-              multiple = T,
-              choices = sort(unique(playerStats$TEAM)),
-              selected = playerStats$TEAM,
-              options = list(
-                `selected-text-format` = "count > 1",
-                `actions-box` = TRUE
-              ),
-              choicesOpt = list(
-                style = rep(("color: black; background: white;"), 100)
-              )
-            ),
-
-            pickerInput(
-              inputId = "good_shooter",
-              label = "Filter for good shooters",
-              multiple = TRUE,
-              choices = list(
-                `Overall Shooting` = c(
-                  "Has above average FG%",
-                  "Shoots more than avg"
-                ),
-                `3-point Specialists` = c(
-                  "Shoots above avg % from 3",
-                  "Shoots more 3s than avg"
-                ),
-                `2-point Specilists` = c(
-                  "Shoots above avg % from 2",
-                  "Shoots more 2s than avg"
-                )
-              ),
-              selected = NULL,
-              # allowing ability to select all and also rendering nicer ui "you've selected 3 things" instead of a list
-              options = list(
-                `selected-text-format` = "count > 1",
-                `actions-box` = TRUE
-              ),
-              choicesOpt = list(
-                style = rep(("color: black; background: white;"), 100)
-              )
-            ),
-            pickerInput(
-              inputId = "high_avgs",
-              label = "Filter for elite performers",
-              multiple = TRUE,
-              choices = list(
-                `Is in the 95th percentile for:` = c(
-                  "Points",
-                  "Rebounds",
-                  "Assists",
-                  "Steals",
-                  "Blocks"
-                )
-              ),
-              selected = NULL,
-              options = list(
-                `selected-text-format` = "count > 1",
-                `actions-box` = TRUE
-              ),
-              choicesOpt = list(
-                style = rep(("color: black; background: white;"), 100)
-              )
-            ),
-            pickerInput(
-              inputId = "threshold",
-              label = "Filter for threshold check",
-              multiple = TRUE,
-              choices = list(
-                `Thresholds` = c(
-                  "Has played 50% of possible games",
-                  "Team wins at least 50% of the games when player plays"
-                )
-              ),
-              selected = NULL,
-              options = list(
-                `selected-text-format` = "count > 1",
-                `actions-box` = TRUE
-              ),
-              choicesOpt = list(
-                style = rep(("color: black; background: white;"), 100)
-              )
-            ),
-
-            actionButton("update",
-              label = "Update Data",
-              icon = icon("rocket")
-            )
+          sidebarPanel(width = 3,
+                       pickerInput(
+                         inputId = "xcol",
+                         label = "Choose teams",
+                         multiple = T,
+                         choices = sort(unique(playerStats$TEAM)),
+                         selected = playerStats$TEAM,
+                         options = list(
+                           `selected-text-format` = "count > 1",
+                           `actions-box` = TRUE
+                         ),
+                         choicesOpt = list(
+                           style = rep(("color: black; background: white;"), 100)
+                         )
+                       ),
+                       
+                       pickerInput(
+                         inputId = "good_shooter",
+                         label = "Filter for good shooters",
+                         multiple = TRUE,
+                         choices = list(
+                           `Overall Shooting` = c(
+                             "Has above average FG%",
+                             "Shoots more than avg"
+                           ),
+                           `3-point Specialists` = c(
+                             "Shoots above avg % from 3",
+                             "Shoots more 3s than avg"
+                           ),
+                           `2-point Specilists` = c(
+                             "Shoots above avg % from 2",
+                             "Shoots more 2s than avg"
+                           )
+                         ),
+                         selected = NULL,
+                         # allowing ability to select all and also rendering nicer ui "you've selected 3 things" instead of a list
+                         options = list(
+                           `selected-text-format` = "count > 1",
+                           `actions-box` = TRUE
+                         ),
+                         choicesOpt = list(
+                           style = rep(("color: black; background: white;"), 100)
+                         )
+                       ),
+                       pickerInput(
+                         inputId = "high_avgs",
+                         label = "Filter for elite performers",
+                         multiple = TRUE,
+                         choices = list(
+                           `Is in the 95th percentile for:` = c(
+                             "Points",
+                             "Rebounds",
+                             "Assists",
+                             "Steals",
+                             "Blocks"
+                           )
+                         ),
+                         selected = NULL,
+                         options = list(
+                           `selected-text-format` = "count > 1",
+                           `actions-box` = TRUE
+                         ),
+                         choicesOpt = list(
+                           style = rep(("color: black; background: white;"), 100)
+                         )
+                       ),
+                       pickerInput(
+                         inputId = "threshold",
+                         label = "Filter for threshold check",
+                         multiple = TRUE,
+                         choices = list(
+                           `Thresholds` = c(
+                             "Has played 50% of possible games",
+                             "Team wins at least 50% of the games when player plays"
+                           )
+                         ),
+                         selected = NULL,
+                         options = list(
+                           `selected-text-format` = "count > 1",
+                           `actions-box` = TRUE
+                         ),
+                         choicesOpt = list(
+                           style = rep(("color: black; background: white;"), 100)
+                         )
+                       ),
+                       
+                       actionButton("update",
+                                    label = "Update Data",
+                                    icon = icon("rocket")
+                       )
           ),
-          mainPanel(width = 10,
-            # begin first fluid row, fluidRows define horizontal output
-            fluidRow(
-                column(9,
-              box(
-                solidHeader = TRUE,
-                status = "primary",
-                title = "Scatter Plot of Rebounds and Assists Relationship, Sized by Points ",
-                plotlyOutput("scatter"),
-                width = 12,
-                height = "475px"
-              )),
-              column(
-                  3,
-                  box(
-                      solidHeader = TRUE,
-                      status = "primary",
-                      title = "Summary Stats by Position",
-                      # div(...) is another example of output we can do in a box
-                      div(
-                          DT::dataTableOutput("summarydata")
+          mainPanel(width = 9,
+                    # begin first fluid row, fluidRows define horizontal output
+                    fluidRow(
+                      box(
+                        solidHeader = TRUE,
+                        status = "primary",
+                        title = "Scatter Plot of Rebounds and Assists Relationship, Sized by Points ",
+                        plotlyOutput("scatter"),
+                        width = 12,
+                        height = "475px"
+                      )
+                    ),
+                    fluidRow(
+                      column(
+                        6,
+                        box(
+                          solidHeader = TRUE,
+                          status = "primary",
+                          title = "Position Representation",
+                          plotlyOutput("piechart"),
+                          width = 12,
+                          height = "475px"
+                        )
                       ),
-                      # max width = 12, so since this is 12 it will span the whole body
-                      width = 12,
-                      height = "475px"
-                  ) # end box
-              )
-            ),
-            fluidRow(
-              column(
-                6,
-                box(
-                  solidHeader = TRUE,
-                  status = "primary",
-                  title = "Position Representation",
-                  plotlyOutput("piechart"),
-                  width = 12,
-                  height = "475px"
-                )
-              ),
-              column(
-                  6,
-                  box(
-                      solidHeader = TRUE,
-                      status = "primary",
-                      title = "Team Representation",
-                      plotlyOutput("histogram"),
-                      width = 12,
-                      height = "475px"
-                  )
-              )
-
-            ),
-            # begin third fluid row
-            fluidRow(
-              box(
-                solidHeader = TRUE,
-                status = "primary",
-                title = "Filtered Data",
-                # div(...) is another example of output we can do in a box
-                div(
-                  DT::dataTableOutput("dataexample")
-                ),
-                # max width = 12, so since this is 12 it will span the whole body
-                width = 12
-              ) # end box
-            )
+                      column(
+                        6,
+                        box(
+                          solidHeader = TRUE,
+                          status = "primary",
+                          title = "Summary Stats by Position",
+                          # div(...) is another example of output we can do in a box
+                          div(
+                            DT::dataTableOutput("summarydata")
+                          ),
+                          # max width = 12, so since this is 12 it will span the whole body
+                          width = 12,
+                          height = "475px"
+                        ) # end box
+                      )
+                    ),
+                    fluidRow(
+                      column(
+                        12,
+                        box(
+                          solidHeader = TRUE,
+                          status = "primary",
+                          title = "Team Representation",
+                          plotlyOutput("histogram"),
+                          width = 12,
+                          height = "475px"
+                        )
+                      )
+                    ),
+                    # begin third fluid row
+                    fluidRow(
+                      box(
+                        solidHeader = TRUE,
+                        status = "primary",
+                        title = "Filtered Data",
+                        # div(...) is another example of output we can do in a box
+                        div(
+                          DT::dataTableOutput("dataexample")
+                        ),
+                        # max width = 12, so since this is 12 it will span the whole body
+                        width = 12
+                      ) # end box
+                    )
           )
         ) # end third fluid row
       }
-
+      
       # if users click second tab, this is the output that will be shown
       else if (input$tabs == "Shooting Stats") {
         # wellPanel creates the backing to contain all the fluidRow arguments
         sidebarLayout(
           sidebarPanel(
             selectInput("year",
-              label = "Year:",
-              choices = c(unique(shootingStats$YEAR)),
-              multiple = FALSE
+                        label = "Year:",
+                        choices = c(unique(shootingStats$YEAR)),
+                        multiple = FALSE
             ),
-
+            
             selectInput("players", "Choose a Player:",
-              choices = "",
-              selected = c("2019-20")
+                        choices = "",
+                        selected = c("2019-20")
             ),
-
+            
             checkboxGroupInput(
               inputId = "checkBox",
               label = "Choose Shooting Range:",
               choices = c("Close Range", "Mid Range", "Deep Shot")
             ),
-
+            
             actionButton(
               inputId = "update2",
               label = "Update Data",
@@ -404,18 +413,33 @@ shinyApp(
                 collapsible = TRUE,
                 plotlyOutput("shooting_plot")
               )
-            ), # end fluidrow
-
+            ),
+            
             # begin next fluidRow
             fluidRow(
               dataTableOutput("shooting_percentages")
+            ),
+            
+            fluidRow(
+              # begin column of fluid row
+              box(
+                title = "",
+                width = 12,
+                # status = "warning",
+                solidHeader = TRUE,
+                collapsible = TRUE,
+                plotlyOutput("shooting_plot_time")
+              )
             )
+            # end fluidrow
+            
+
           )
         )
       }
     }) # end output$body
-
-
+    
+    
     ## this is where the checkboxes come into play ##
     playerData <- eventReactive(input$update, {
       teams_selected <- as.list(input$xcol)
@@ -527,9 +551,9 @@ shinyApp(
           }
         )
     })
-
-
-
+    
+    
+    
     output$dataexample <- DT::renderDataTable({
       dataFilt <- playerData() %>%
         rename(
@@ -541,7 +565,7 @@ shinyApp(
         filter(TEAM %in% as.list(input$xcol)) %>%
         arrange(desc(PTS)) %>%
         select(-`X...`, -`color`, -`team_color`)
-
+      
       DT::datatable(
         data = dataFilt,
         escape = FALSE,
@@ -552,8 +576,8 @@ shinyApp(
         class = "cell-border stripe"
       )
     })
-
-
+    
+    
     dataFilt2 <- eventReactive(input$update, {
       mydf <- playerData() %>%
         group_by(POSITION) %>%
@@ -592,7 +616,7 @@ shinyApp(
         class = "cell-border stripe"
       )
     })
-
+    
     output$scatter <- renderPlotly(
       if (nrow(playerData()) > 1) {
         fig <- plot_ly()
@@ -600,29 +624,29 @@ shinyApp(
           tempDat <- playerData() %>%
             filter(POSITION == i)
           fig <- add_trace(fig,
-            data = tempDat,
-            y = ~AST,
-            x = ~REB,
-            size = ~PTS,
-            color = ~POSITION,
-            text = paste(
-              "Player: ", tempDat$PLAYER,
-              "<br>Points: ", tempDat$PTS,
-              "<br>Team: ", tempDat$TEAM
-            ),
-            hoverinfo = paste("Player", tempDat$PLAYER),
-            type = "scatter",
-            mode = "markers",
-            marker = list(
-              color = ~color,
-              line = list(
-                color = ~color,
-                width = 2
-              )
-            )
+                           data = tempDat,
+                           y = ~AST,
+                           x = ~REB,
+                           size = ~PTS,
+                           color = ~POSITION,
+                           text = paste(
+                             "Player: ", tempDat$PLAYER,
+                             "<br>Points: ", tempDat$PTS,
+                             "<br>Team: ", tempDat$TEAM
+                           ),
+                           hoverinfo = paste("Player", tempDat$PLAYER),
+                           type = "scatter",
+                           mode = "markers",
+                           marker = list(
+                             color = ~color,
+                             line = list(
+                               color = ~color,
+                               width = 2
+                             )
+                           )
           )
         }
-
+        
         fig
       }
       else {
@@ -642,7 +666,7 @@ shinyApp(
         )
       }
     )
-
+    
     output$piechart <- renderPlotly(
       plot_ly(
         type = "pie",
@@ -670,27 +694,27 @@ shinyApp(
         temp
       }
     )
-
+    
     output$histogram <- renderPlotly(
       plot_ly(dataHist(),
-        x = ~TEAM,
-        y = ~n,
-        type = "bar",
-        marker = list(color = ~col)
+              x = ~TEAM,
+              y = ~n,
+              type = "bar",
+              marker = list(color = ~col)
       ) %>%
         layout(
           yaxis = list(title = "Number of Players")
         )
     )
     ### end of making the output for the box with the time series ###
-
-
-
-
-
-
+    
+    
+    
+    
+    
+    
     ### below this is the output for the second tab ###
-
+    
     # making the selections only have the info for the year chosen
     observeEvent(input$year, {
       dat <- shootingStats %>%
@@ -699,55 +723,89 @@ shinyApp(
         as.data.table() %>%
         arrange(desc(TFGA)) %>%
         select(Player)
-
+      
       if (is.null(input$year)) {
         updateSelectInput(session, "players",
-          choices = c("dat$Player")
+                          choices = c("dat$Player")
         )
       }
-
+      
       else {
         updateSelectInput(session, "players",
-          choices = c(dat$Player)
+                          choices = c(dat$Player)
         )
       }
     })
-
-
+    
+    
     shootingData <- eventReactive(input$update2, {
       shootingStats %>%
         filter(Player == input$players, YEAR == input$year) %>%
         mutate(TFGA = FGA + FGA.1 + FGA.2 + FGA.3 + FGA.4 + FGA.5)
     })
-
-
+    
+    
     output$playerNam <- renderText({
       (shootingData()$Player)
     })
-
+    
     output$playerTeam <- renderText({
       (shootingData()$TEAM)
     })
-
+    
     output$playerShots <- renderText({
       (shootingData()$TFGA)
     })
-
-    # reactive to the second slider
+    
+    timeData <- eventReactive(input$update2, {
+      data = shootingStats %>%
+        filter(Player == input$players) %>%
+        mutate(TFGA = FGA + FGA.1 + FGA.2 + FGA.3 + FGA.4 + FGA.5) %>%
+        mutate(gameYear = as.factor(case_when(
+          YEAR == "2019-20" ~ "2020",
+          YEAR == "2018-19" ~ "2019",
+          YEAR == "2017-18" ~ "2018",
+          YEAR == "2016-17" ~ "2017",
+          YEAR == "2015-16" ~ "2016"
+        )))
+    })
+    
+    # reactive to player name
+    output$shooting_plot_time = renderPlotly({
+     
+      
+      if (nrow(timeData()) == 0) {
+        return(NULL)
+      }
+      
+      p <- timeData() %>%
+        plot_ly(
+          x = ~gameYear,
+          y = ~TFGA,
+          type = 'scatter',
+          mode = 'lines'
+          ) %>%
+        layout(
+          title = "Average Shot Attempts Over Time",
+          xaxis = list(title = "Year"),
+          yaxis = list(title = "Total Field Goal Attempted")
+        )
+    })
+    
     output$shooting_plot <- renderPlotly({
       data <- shootingData()
-
+      
       data <- data.frame(
         x = c("LESS THAN 5FT.", "5-9 FT.", "10-14 FT.", "15-19 FT.", "20-24 FT.", "25-29 FT."),
         y = c(data$`FG.`, data$`FG..1`, data$`FG..2`, data$`FG..3`, data$`FG..4`, data$`FG..5`),
         z = c(data$`FGA`, data$`FGA.1`, data$`FGA.2`, data$`FGA.3`, data$`FGA.4`, data$`FGA.5`)
       )
       data$x <- factor(data$x, levels = c("LESS THAN 5FT.", "5-9 FT.", "10-14 FT.", "15-19 FT.", "20-24 FT.", "25-29 FT."))
-
+      
       if (nrow(data) == 0) {
         return(NULL)
       }
-
+      
       p <- data %>%
         plot_ly(
           x = ~x,
@@ -766,15 +824,15 @@ shinyApp(
           yaxis = list(title = "Shooting %")
         )
     })
-
-
-
+    
+    
+    
     shootingPercentages <- eventReactive(input$update2, {
       dataset <- shootingStats %>%
         filter(YEAR == input$year) %>%
         filter(Player == input$players)
     })
-
+    
     # reactive
     output$shooting_percentages <- isolate(renderDataTable(
       {
