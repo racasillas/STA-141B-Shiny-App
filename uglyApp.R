@@ -155,12 +155,11 @@ sidebar <-
     width = 250
   )
 
+header <- headerPanel("NBA Visualization")
 
 
 # creating the body
-body <- mainPanel(
-  uiOutput("body")
-)
+body <- uiOutput("body")
 
 
 shinyApp(
@@ -179,18 +178,8 @@ shinyApp(
     output$body <- renderUI({
       # render this output when they choose the first tab
       if (input$tabs == "Players") {
-          tags$head(tags$style(
-              HTML('
-         #sidebar {
-            background-color: #00000;
-        }
-
-        body, label, input, button, select { 
-          font-family: "Arial";
-        }')
-          ))
         sidebarLayout(
-          sidebarPanel(width = 3,
+          sidebarPanel(width = 2,
             pickerInput(
               inputId = "xcol",
               label = "Choose teams",
@@ -281,9 +270,10 @@ shinyApp(
               icon = icon("rocket")
             )
           ),
-          mainPanel(width = 9,
+          mainPanel(width = 10,
             # begin first fluid row, fluidRows define horizontal output
             fluidRow(
+                column(9,
               box(
                 solidHeader = TRUE,
                 status = "primary",
@@ -291,6 +281,21 @@ shinyApp(
                 plotlyOutput("scatter"),
                 width = 12,
                 height = "475px"
+              )),
+              column(
+                  3,
+                  box(
+                      solidHeader = TRUE,
+                      status = "primary",
+                      title = "Summary Stats by Position",
+                      # div(...) is another example of output we can do in a box
+                      div(
+                          DT::dataTableOutput("summarydata")
+                      ),
+                      # max width = 12, so since this is 12 it will span the whole body
+                      width = 12,
+                      height = "475px"
+                  ) # end box
               )
             ),
             fluidRow(
@@ -306,33 +311,17 @@ shinyApp(
                 )
               ),
               column(
-                6,
-                box(
-                  solidHeader = TRUE,
-                  status = "primary",
-                  title = "Summary Stats by Position",
-                  # div(...) is another example of output we can do in a box
-                  div(
-                    DT::dataTableOutput("summarydata")
-                  ),
-                  # max width = 12, so since this is 12 it will span the whole body
-                  width = 12,
-                  height = "475px"
-                ) # end box
+                  6,
+                  box(
+                      solidHeader = TRUE,
+                      status = "primary",
+                      title = "Team Representation",
+                      plotlyOutput("histogram"),
+                      width = 12,
+                      height = "475px"
+                  )
               )
-            ),
-            fluidRow(
-              column(
-                12,
-                box(
-                  solidHeader = TRUE,
-                  status = "primary",
-                  title = "Team Representation",
-                  plotlyOutput("histogram"),
-                  width = 12,
-                  height = "475px"
-                )
-              )
+
             ),
             # begin third fluid row
             fluidRow(
