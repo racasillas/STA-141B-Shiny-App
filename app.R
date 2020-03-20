@@ -7,11 +7,135 @@ library(plotly)
 library(RSelenium)
 library(wdman)
 library(glue)
+library(data.table)
+
+
+## Getting the Data
+
+
+# URLs for getting the player and team data from GitHub
+
+playerURL <- "https://raw.githubusercontent.com/A10theHero/technicallyADatabase/master/players.txt"
+
+teamURL <- "https://raw.githubusercontent.com/A10theHero/technicallyADatabase/master/teams.txt"
+
+shootingURL <- "https://raw.githubusercontent.com/A10theHero/technicallyADatabase/master/shots.txt"
+
+
+###### Function #####
+
+# Extracts from a URL
+
+rawExtract = function(url) {
+  
+  
+  # Read in the raw file and remove the tab characters
+  # Note: This introduces a new column that's just numbered according to the number of rows
+  dat <- read_lines(url) %>% str_split(fixed("\t"))
+  
+  
+  # Save the column names to a separate variable
+  # Note: \" is still in these variables, but knowing their length is important
+  dat.names <- dat[[1]]
+  
+  
+  # Next, remove the \" characters
+  dat <- dat %>% unlist() %>% str_remove_all('\"')
+  
+  
+  # Update the colnames and remove them from dat
+  dat.names <- dat[1:length(dat.names)]
+  dat <- dat[(length(dat.names) + 1):length(dat)]
+  
+  
+  # Convert the data into a matrix, with ncol = length(dat.names) + 1 (for the extra column introduced earlier)
+  dat <- dat %>% matrix(ncol = length(dat.names) + 1, byrow = TRUE)
+  
+  
+  # Remove that extra column
+  dat <- dat[ , 2:ncol(dat)]
+  
+  
+  # Add the column names to dat
+  colnames(dat) <- dat.names
+  
+  
+  # Return the matrix as a data frame
+  return(data.frame(dat, stringsAsFactors = FALSE))
+  
+}
+
+
+
+##### Running the Function #####
+
+
+playerStats <- rawExtract(playerURL)
+
+# Next, we need to convert columns that are classified as matricies into character classes
+for (i in 1:ncol(playerStats)) {
+  playerStats[[i]] <- playerStats[[i]] %>% as.character()
+}
+
+
+# making new df so that we don't modify extractedPlayerStats after scraping so that we can 
+# adjust as we need to without rescraping
+playerStats <- playerStats %>% 
+  # mutating numerics
+  mutate_at(vars(-PLAYER, -TEAM, -POSITION, -color, -team_color), funs(as.numeric)) %>% 
+  rename(`2PA` = `X2PA`,
+         `2PM` = `X2PM`,
+         `3PA` = `X3PA`,
+         `3PM` = `X3PM`,
+         `2PT_ATT_PER` = `X2PT_ATT_PER`,
+         `3PT_ATT_PER` = `X3PT_ATT_PER`)
+
+playerStats <- playerStats %>% 
+  # sorting in a regular order, omitting duplic cols
+  select(POS.RANK, PLAYER, TEAM, AGE, GP, W, L, MIN, PTS, FGM, FGA, FG_PCT,
+         `2PA`, `2PM`, `FG2_PCT`, `3PA`, `3PM`, FG3_PCT, `2PT_ATT_PER`, `3PT_ATT_PER`, 
+         FTM, FTA, FT_PCT, PER_PTS_FT, PER_PTS_2P, PER_PTS_3P, OREB, DREB, 
+         REB, AST, TOV, STL, BLK, PF, FP, DD2, TD3, X..., POSITION, PLAYER_ID, RANK) %>% 
+  
+  arrange(desc(PTS))
+
+
+
+cols <- RColorBrewer::brewer.pal(length(unique(playerStats$POSITION)), name = "Dark2")
+
+
+playerStats <- playerStats %>% 
+  mutate(color = factor(playerStats$POSITION, labels = cols))
+
+
+require(teamcolors)
+pal <- league_pal("nba") %>% 
+  as.data.frame() %>% 
+  mutate(
+    TEAM= 
+      c("ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
+        "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
+        "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS"
+      )
+  ) %>% 
+  rename(team_color = ".")
+
+playerStats <- merge(playerStats, pal, by = "TEAM")
+
+
+
+teamStats <- rawExtract(teamURL)
+
+
+shootingStats <- rawExtract(shootingURL)
+
+shootingStats <- shootingStats %>% 
+  mutate_at(vars(-Player, -TEAM, -YEAR), funs(as.numeric))
+
 
 
 if (interactive()) {
   # making the header
-  # there's a lot more we can do with the header, but this is just the basic format
   header <-
     dashboardHeaderPlus(
       title = tagList(
@@ -21,14 +145,14 @@ if (interactive()) {
         img(src = "")
       ),
       titleWidth = 250
-    ) # we can make an image in the header if we want to (like the NBA or something)
-  
+    )
+
   # making the sidebar
+  # it uses menu items to make separate "tabs"
   sidebar <- dashboardSidebar(
     width = 250,
     sidebarMenu(
       id = "tabs",
-      
       # create first menu item (aka panel on the left)
       menuItem(
         "Players",
@@ -56,7 +180,6 @@ if (interactive()) {
               style = rep(("color: black; background: white;"), 100)
             )
           ),
-          
           pickerInput(
             inputId = "good_shooter",
             label = "Filter for good shooters",
@@ -76,6 +199,7 @@ if (interactive()) {
               )
             ),
             selected = NULL,
+            # allowing ability to select all and also rendering nicer ui "you've selected 3 things" instead of a list
             options = list(
               `selected-text-format` = "count > 1",
               `actions-box` = TRUE
@@ -84,7 +208,7 @@ if (interactive()) {
               style = rep(("color: black; background: white;"), 100)
             )
           ),
-          
+
           pickerInput(
             inputId = "high_avgs",
             label = "Filter for elite performers",
@@ -107,7 +231,7 @@ if (interactive()) {
               style = rep(("color: black; background: white;"), 100)
             )
           ),
-          
+
           pickerInput(
             inputId = "threshold",
             label = "Filter for threshold check",
@@ -127,7 +251,7 @@ if (interactive()) {
               style = rep(("color: black; background: white;"), 100)
             )
           ),
-          
+
           # trigger mechanism so we don't constantly load new data on each input change
           actionButton(
             inputId = "update",
@@ -136,7 +260,7 @@ if (interactive()) {
           )
         ) # end conditional panel
       ), # end first menu item
-      
+
       # makes the second "tab"
       menuItem(
         "Shooting Statistics",
@@ -146,29 +270,31 @@ if (interactive()) {
         selectInput(
           inputId = "year",
           label = "Year: ",
-          choices = c(unique(shootingStats_year$YEAR)),
+          choices = c(unique(shootingStats$YEAR)),
           multiple = FALSE
         ),
         selectInput("players", "Choose a Player:",
-                    choices = "",
-                    selected = c("2019-20")
+          choices = "",
+          selected = c("2019-20")
         ),
-        checkboxGroupInput(inputId = "checkBox",
-                           label = "choose range: ",
-                           choices = c("Close Range", "Mid Range", "Deep Shot")),
+        checkboxGroupInput(
+          inputId = "checkBox",
+          label = "choose range: ",
+          choices = c("Close Range", "Mid Range", "Deep Shot")
+        ),
         actionButton(
           inputId = "update2",
           label = "Update Data",
           icon = icon("rocket")
         )
       ) # end second tab
-    )) # end sidebar creation
-  
+    )
+  ) # end sidebar creation
+
   # creating the body
   body <- dashboardBody(
-    
     uiOutput("body"),
-    
+
     # all of this is just color customization for the header
     # it can be whatever we want this is just filler for now
     tags$head(tags$style(
@@ -197,22 +323,22 @@ if (interactive()) {
       )
     ))
   ) # end color customization
-  
-  
+
+
   shinyApp(
     # making the UI a component of the header we created earlier, the sidebar we created earlier, and the body created below
-    ui = 
-      
+    ui =
+
       dashboardPagePlus(header,
-                        sidebar,
-                        body,
-                        skin = "blue"
+        sidebar,
+        body,
+        skin = "blue"
       ),
-    
+
     server = function(input, output, session) {
-      # suppress warnings  
-      storeWarn<- getOption("warn")
-      options(warn = -1) 
+      # suppress warnings
+      storeWarn <- getOption("warn")
+      options(warn = -1)
       # body reactivity to input$tabs
       output$body <- renderUI({
         # if there is no tab selected, show this message
@@ -317,7 +443,7 @@ if (interactive()) {
             ) # end third fluid row
           ) # end well panel
         }
-        
+
         # if users click second tab, this is the output that will be shown
         else if (input$sidebarItemExpanded == "tab2") {
           # wellPanel creates the backing to contain all the fluidRow arguments
@@ -325,30 +451,48 @@ if (interactive()) {
             # begin fluidrow
             fluidRow(
               infoBox(
-                "Player's Name", textOutput("orderNum"), width = 12
+                "Name",
+                textOutput("playerNam"),
+                width = 4,
+                icon = icon("user"),
+                color = "orange"
+              ),
+              infoBox(
+                "Team",
+                textOutput("playerTeam"),
+                width = 4,
+                icon = icon("users"),
+                color = "olive"
+              ),
+              infoBox(
+                "Shots Per Game",
+                textOutput("playerShots"),
+                width = 4,
+                icon = icon("user-secret"),
+                color = "blue"
               )
             ),
             fluidRow(
               # begin column of fluid row
-              box(title = "# of Different-Range Shooting",
-                  width = 12,
-                  # status = "warning", 
-                  solidHeader = TRUE, 
-                  collapsible = TRUE,
-                  plotlyOutput("shooting_plot")
+              box(
+                title = "",
+                width = 12,
+                # status = "warning",
+                solidHeader = TRUE,
+                collapsible = TRUE,
+                plotlyOutput("shooting_plot")
               )
             ), # end fluidrow
-            
-            # begin next fluidRow, mainly used to show how we can have different horizontal and vertical sections for output
+
+            # begin next fluidRow
             fluidRow(
               dataTableOutput("shooting_percentages")
             )
-            
           )
         }
       }) # end output$body
-      
-      
+
+
       ## this is where the checkboxes come into play ##
       playerData <- eventReactive(input$update, {
         teams_selected <- as.list(input$xcol)
@@ -460,9 +604,9 @@ if (interactive()) {
             }
           )
       })
-      
-      
-      
+
+
+
       output$dataexample <- DT::renderDataTable({
         dataFilt <- playerData() %>%
           rename(
@@ -471,9 +615,10 @@ if (interactive()) {
             `FGA% FROM 2` = `2PT_ATT_PER`, `FGA% FROM 3` = `3PT_ATT_PER`,
             `PPG% FROM 2` = PER_PTS_2P, `PPG% FROM 3` = PER_PTS_3P
           ) %>%
-          filter(TEAM %in% as.list(input$xcol)) %>% 
-          arrange(desc(PTS))
-        
+          filter(TEAM %in% as.list(input$xcol)) %>%
+          arrange(desc(PTS)) %>%
+          select(-`X...`, -`color`, -`team_color`)
+
         DT::datatable(
           data = dataFilt,
           escape = FALSE,
@@ -485,8 +630,8 @@ if (interactive()) {
           class = "cell-border stripe"
         )
       })
-      
-      
+
+
       dataFilt2 <- eventReactive(input$update, {
         mydf <- playerData() %>%
           group_by(POSITION) %>%
@@ -525,38 +670,38 @@ if (interactive()) {
           class = "cell-border stripe"
         )
       })
-      
+
       output$scatter <- renderPlotly(
         if (nrow(playerData()) > 1) {
-          
           fig <- plot_ly()
           for (i in unique(playerData()$POSITION)) {
-            tempDat <- playerData() %>% 
-              filter(POSITION == i) 
-            fig <- add_trace(fig, 
-                             data = tempDat, 
-                             y = ~AST, 
-                             x = ~REB, 
-                             size = ~PTS,
-                             color = ~POSITION,
-                             text = paste(
-                               "Player: ",  tempDat$PLAYER,
-                               "<br>Points: ",  tempDat$PTS,
-                               "<br>Team: ",  tempDat$TEAM
-                             ),
-                             hoverinfo = paste("Player", tempDat$PLAYER),
-                             type = 'scatter', 
-                             mode = 'markers',
-                             marker = list(color = ~color,
-                                           line = list(
-                                             color = ~color,
-                                             width = 2
-                                           )
-                             )
+            tempDat <- playerData() %>%
+              filter(POSITION == i)
+            fig <- add_trace(fig,
+              data = tempDat,
+              y = ~AST,
+              x = ~REB,
+              size = ~PTS,
+              color = ~POSITION,
+              text = paste(
+                "Player: ", tempDat$PLAYER,
+                "<br>Points: ", tempDat$PTS,
+                "<br>Team: ", tempDat$TEAM
+              ),
+              hoverinfo = paste("Player", tempDat$PLAYER),
+              type = "scatter",
+              mode = "markers",
+              marker = list(
+                color = ~color,
+                line = list(
+                  color = ~color,
+                  width = 2
+                )
+              )
             )
           }
-          
-          fig 
+
+          fig
         }
         else {
           fig <- plot_ly(
@@ -575,7 +720,7 @@ if (interactive()) {
           )
         }
       )
-      
+
       output$piechart <- renderPlotly(
         plot_ly(
           type = "pie",
@@ -583,122 +728,151 @@ if (interactive()) {
           labels = ~`POSITION`,
           marker = list(
             colors = ~color,
-            line = list(color = '#FFFFFF', width = 1)
+            line = list(color = "#FFFFFF", width = 1)
           ),
           textinfo = "label+percent",
           insidetextfont = list(color = "#FFFFFF")
         )
       )
       dataHist <- eventReactive(
-        input$update, {
-          temp <- playerData() %>% 
-            group_by(TEAM) %>% 
+        input$update,
+        {
+          temp <- playerData() %>%
+            group_by(TEAM) %>%
             # n_distinct to avoid repeats of players if they play > 1 position
-            summarize(n = n_distinct(PLAYER),
-                      col = unique(team_color, TEAM))
+            summarize(
+              n = n_distinct(PLAYER),
+              col = unique(team_color, TEAM)
+            )
           temp$TEAM <- reorder(temp$TEAM, temp$n)
           temp
-          
-        })
-      
+        }
+      )
+
       output$histogram <- renderPlotly(
         plot_ly(dataHist(),
-                x = ~TEAM, 
-                y = ~n, 
-                type = "bar", 
-                marker = list(color = ~col)) %>% 
+          x = ~TEAM,
+          y = ~n,
+          type = "bar",
+          marker = list(color = ~col)
+        ) %>%
           layout(
-            yaxis =  list(title = "Number of Players")
+            yaxis = list(title = "Number of Players")
           )
-      ) 
+      )
       ### end of making the output for the box with the time series ###
-      
-      
-      
-      
-      
-      
+
+
+
+
+
+
       ### below this is the output for the second tab ###
-      
-      
-      shootingData <- eventReactive(input$update2, {
-        shootingStats 
-      })
-      headerData <- eventReactive(input$update2, {
-        temp <- shootingStats %>% 
-          filter(Player == input$players, YEAR == input$year)
-        as.data.frame(temp)
-      })
-      
-      observeEvent(input$year,{
-        dat <- shootingStats %>% 
-          filter(YEAR == input$year) %>% 
+
+      # making the selections only have the info for the year chosen
+      observeEvent(input$year, {
+        dat <- shootingStats %>%
+          mutate(TFGA = FGA + FGA.1 + FGA.2 + FGA.3 + FGA.4 + FGA.5) %>%
+          filter(YEAR == input$year) %>%
+          as.data.table() %>%
+          arrange(desc(TFGA)) %>%
           select(Player)
-        if(is.null(input$year)){
-          updateSelectInput(session,'players',
-                            choices= c("dat$Player"))
+
+        if (is.null(input$year)) {
+          updateSelectInput(session, "players",
+            choices = c("dat$Player")
+          )
         }
-        else{
-          updateSelectInput(session,'players',
-                            choices= c(dat$Player))
+
+        else {
+          updateSelectInput(session, "players",
+            choices = c(dat$Player)
+          )
         }
-      }) 
-      # 
-      # reactive to the second slider
-      output$orderNum <- renderText({
-        (headerData()$Player)
       })
-      
-      
+
+
+      shootingData <- eventReactive(input$update2, {
+        shootingStats %>%
+          filter(Player == input$players, YEAR == input$year) %>%
+          mutate(TFGA = FGA + FGA.1 + FGA.2 + FGA.3 + FGA.4 + FGA.5)
+      })
+
+
+      output$playerNam <- renderText({
+        (shootingData()$Player)
+      })
+
+      output$playerTeam <- renderText({
+        (shootingData()$TEAM)
+      })
+
+      output$playerShots <- renderText({
+        (shootingData()$TFGA)
+      })
+
       # reactive to the second slider
       output$shooting_plot <- renderPlotly({
-        
-        data = shootingData() %>% 
+        data <- shootingData()
+
+        data <- data.frame(
+          x = c("LESS THAN 5FT.", "5-9 FT.", "10-14 FT.", "15-19 FT.", "20-24 FT.", "25-29 FT."),
+          y = c(data$`FG.`, data$`FG..1`, data$`FG..2`, data$`FG..3`, data$`FG..4`, data$`FG..5`),
+          z = c(data$`FGA`, data$`FGA.1`, data$`FGA.2`, data$`FGA.3`, data$`FGA.4`, data$`FGA.5`)
+        )
+        data$x <- factor(data$x, levels = c("LESS THAN 5FT.", "5-9 FT.", "10-14 FT.", "15-19 FT.", "20-24 FT.", "25-29 FT."))
+
+        if (nrow(data) == 0) {
+          return(NULL)
+        }
+
+        p <- data %>%
+          plot_ly(
+            x = ~x,
+            y = ~y,
+            type = "bar",
+            text = paste(
+              "Shots per game at this range:", data$z,
+              "<br>Percentage:", data$y
+            ),
+            hoverinfo = "text",
+            color = ~x
+          ) %>%
+          layout(
+            title = "Shooting Percentages at Each Range (hover to see shot attempts)",
+            xaxis = list(title = "Distance"),
+            yaxis = list(title = "Shooting %")
+          )
+      })
+
+
+
+      shootingPercentages <- eventReactive(input$update2, {
+        dataset <- shootingStats %>%
           filter(YEAR == input$year) %>%
           filter(Player == input$players)
-        data <- data.frame(x = c("LESS THAN 5FT.", "5-9 FT.", "10-14 FT.", "15-19 FT.", "20-24 FT.", "25-29 FT."),
-                           y = c(data$`FG.`, data$`FG..1`, data$`FG..2`, data$`FG..3`, data$`FG..4`, data$`FG..5`))
-        data$x <- factor(data$x, levels = c("LESS THAN 5FT.", "5-9 FT.", "10-14 FT.", "15-19 FT.", "20-24 FT.", "25-29 FT."))
-        
-        if (nrow(data) == 0){
-          return(NULL)
-        }
-        p <- data %>% plot_ly(x = ~x,
-                              y = ~y, 
-                              type = 'bar',
-                              color = ~x) %>%
-          layout(title = 'Range Bar Chart',
-                 xaxis = list(title = 'Distance'),
-                 yaxis = list(title = '%'))
       })
-      
-      
-      
-      shootingPercentages <- eventReactive(input$update2, {
-        dataset = shootingStats %>% 
-          filter(YEAR == input$year) %>% 
-          filter(Player == input$players)
-      })
-      
-      # reactive 
-      output$shooting_percentages = isolate(renderDataTable({
-        
-        if (nrow(shootingPercentages()) == 0){
-          return(NULL)
-        }
-        shootingPercentages() %>%
-          summarize(
-            `Close Range` = paste0(round((FGM+FGM.1)/(FGA+FGA.1) * 100, 2), "%"),
-            `Mid Range` = paste0(round((FGM.2+FGM.3)/(FGA.2+FGA.3)* 100,2), "%"),
-            `Deep Shot` = paste0(round((FGM.4+FGM.5)/(FGA.4+FGA.5)* 100,2), "%")
-          ) %>%
-          select(c(input$checkBox)) 
-      }, options = list(
-        paging = F, 
-        searching = F,
-        bInfo = F)))
-      
+
+      # reactive
+      output$shooting_percentages <- isolate(renderDataTable(
+        {
+          if (nrow(shootingPercentages()) == 0) {
+            return(NULL)
+          }
+          shootingPercentages() %>%
+            summarize(
+              `Close Range` = paste0(round((FGM + FGM.1) / (FGA + FGA.1) * 100, 2), "%"),
+              `Mid Range` = paste0(round((FGM.2 + FGM.3) / (FGA.2 + FGA.3) * 100, 2), "%"),
+              `Deep Shot` = paste0(round((FGM.4 + FGM.5) / (FGA.4 + FGA.5) * 100, 2), "%")
+            ) %>%
+            select(c(input$checkBox))
+        },
+        options = list(
+          paging = F,
+          searching = F,
+          bInfo = F
+        )
+      ))
     } # close out server
   ) # close out shinyApp()
 }
-
