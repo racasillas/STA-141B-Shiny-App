@@ -623,7 +623,6 @@ if (interactive()) {
           data = dataFilt,
           escape = FALSE,
           options = list(
-            lengthMenu = c(10, 10, -1),
             scrollY = "250px",
             scrollX = TRUE
           ),
