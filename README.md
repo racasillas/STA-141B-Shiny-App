@@ -1,4 +1,4 @@
-# STA-141B-Shiny-App
+# NBA Data Visualization
 
 ### Intro:
 
